@@ -3,6 +3,8 @@
 conf_files = files([
     'mira220.json',
     'mira220_mono.json',
+    'mira050.json',
+    'mira050color.json',
     'imx219.json',
     'imx219_noir.json',
     'imx283.json',

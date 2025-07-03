@@ -4,6 +4,7 @@ rpi_ipa_cam_helper_sources = files([
     'cam_helper.cpp',
     'cam_helper_ov5647.cpp',
     'cam_helper_mira220.cpp',
+    'cam_helper_mira050.cpp',
     'cam_helper_imx219.cpp',
     'cam_helper_imx283.cpp',
     'cam_helper_imx290.cpp',
