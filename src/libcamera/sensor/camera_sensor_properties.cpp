@@ -194,6 +194,22 @@ const CameraSensorProperties *CameraSensorProperties::get(const std::string &sen
 			},
 			.sensorDelays = { },
 		} },
+		{ "mira016", {
+			.unitCellSize = { 400, 400 },
+			.testPatternModes = {
+					{ controls::draft::TestPatternModeOff, 0 },
+					{ controls::draft::TestPatternModeColorBars, 1 },
+					{ controls::draft::TestPatternModeSolidColor, 2 },
+					{ controls::draft::TestPatternModeColorBarsFadeToGray, 3 },
+					{ controls::draft::TestPatternModePn9, 4 },
+				},
+				.sensorDelays = {
+					.exposureDelay = 2,
+					.gainDelay = 1,
+					.vblankDelay = 2,
+					.hblankDelay = 2
+				},		
+		} },
 		{ "mira220", {
 			.unitCellSize = { 1600, 1400 },
 			.testPatternModes = {
