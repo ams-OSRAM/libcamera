@@ -1,11 +1,11 @@
 # SPDX-License-Identifier: CC0-1.0
 
 conf_files = files([
-    'mira016.json',
+    'mira016_mono.json',
     'mira220.json',
     'mira220_mono.json',
     'mira050.json',
-    'mira050color.json',
+    'mira050_mono.json',
     'imx219.json',
     'imx219_noir.json',
     'imx283.json',

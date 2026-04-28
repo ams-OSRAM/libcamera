@@ -52,7 +52,8 @@ Download a local copy of Raspberry Pi's fork of ``libcamera`` from GitHub, befor
   git clone https://github.com/raspberrypi/libcamera.git
   cd libcamera
   meson setup build --buildtype=release -Dgstreamer=enabled -Dpycamera=enabled
-  ninja -C build install
+  ninja -C build 
+  sudo ninja -C build install
 
 You can disable the ``gstreamer`` plugin by replacing ``-Dgstreamer=enabled`` with ``-Dgstreamer=disabled`` during the ``meson`` build configuration.
 If you disable ``gstreamer``, there is no need to install the ``libglib2.0-dev`` and ``libgstreamer-plugins-base1.0-dev`` dependencies.
