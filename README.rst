@@ -31,7 +31,7 @@ If you run ``Raspberry Pi OS Lite``, begin by installing the following packages:
   
 .. code::
 
-  sudo apt install -y python-pip git python3-jinja2
+  sudo apt install -y python3-pip git python3-jinja2
 
 First, install the following ``libcamera`` dependencies:
 .. code::
