@@ -1,6 +1,7 @@
 {
     "version": 2.0,
     "target": "bcm2835",
+    "mono": true,
     "algorithms": [
         {
             "rpi.black_level":
@@ -8,13 +9,11 @@
                 "black_level": 2500
             }
         },
-        {
-            "rpi.dpc": { }
-        },
+
         {
             "rpi.lux":
             {
-                "reference_shutter_speed": 33316,
+                "reference_shutter_speed": 20316,
                 "reference_gain": 1.0,
                 "reference_aperture": 1.0,
                 "reference_lux": 530,
@@ -22,102 +21,9 @@
             }
         },
         {
-            "rpi.noise":
-            {
-                "reference_constant": 0,
-                "reference_slope": 1.449
-            }
-        },
-        {
-            "rpi.geq":
-            {
-                "offset": 271,
-                "slope": 0.00179
-            }
-        },
-        {
-            "rpi.sdn": { }
-        },
-        {
-            "rpi.agc":
-            {
-                "metering_modes":
-                {
-                    "centre-weighted":
-                    {
-                        "weights": [ 3, 3, 3, 2, 2, 2, 2, 1, 1, 1, 1, 0, 0, 0, 0 ]
-                    },
-                    "spot":
-                    {
-                        "weights": [ 2, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 ]
-                    },
-                    "matrix":
-                    {
-                        "weights": [ 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1 ]
-                    }
-                },
-                "exposure_modes":
-                {
-                    "normal":
-                    {
-                        "shutter": [ 100, 10000, 30000, 60000, 120000 ],
-                        "gain": [ 1.0, 2.0, 4.0, 6.0, 6.0 ]
-                    },
-                    "short":
-                    {
-                        "shutter": [ 100, 5000, 10000, 20000, 120000 ],
-                        "gain": [ 1.0, 2.0, 4.0, 6.0, 6.0 ]
-                    }
-                },
-                "constraint_modes":
-                {
-                    "normal": [
-                        {
-                            "bound": "LOWER",
-                            "q_lo": 0.98,
-                            "q_hi": 1.0,
-                            "y_target":
-                            [
-                                0, 0.5,
-                                1000, 0.5
-                            ]
-                        }
-                    ],
-                    "highlight": [
-                        {
-                            "bound": "LOWER",
-                            "q_lo": 0.98,
-                            "q_hi": 1.0,
-                            "y_target":
-                            [
-                                0, 0.5,
-                                1000, 0.5
-                            ]
-                        },
-                        {
-                            "bound": "UPPER",
-                            "q_lo": 0.98,
-                            "q_hi": 1.0,
-                            "y_target":
-                            [
-                                0, 0.8,
-                                1000, 0.8
-                            ]
-                        }
-                    ]
-                },
-                "y_target":
-                [
-                    0, 0.16,
-                    1000, 0.165,
-                    10000, 0.17
-                ]
-            }
-        },
-        {
             "rpi.contrast":
             {
-                "ce_enable": 1,
+                "ce_enable": 0,
                 "gamma_curve":
                 [
                 0,0,
@@ -153,11 +59,45 @@
                 57344,65535,
                 61440,65535,
                 65535,65535
+                
                 ]
             }
         },
         {
             "rpi.sharpen": { }
+        },
+        {
+            "rpi.agc":
+            {
+                "metering_modes":
+                {
+                    "centre-weighted": { "weights": [ 3, 3, 3, 2, 2, 2, 2, 1, 1, 1, 1, 0, 0, 0, 0 ] },
+                    "spot": { "weights": [ 2, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 ] },
+                    "matrix": { "weights": [ 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1 ] }
+                },
+                "exposure_modes":
+                {
+                    "normal":
+                    {
+                        "shutter": [ 100, 10000, 30000, 60000, 120000 ],
+                        "gain": [ 1.0, 2.0, 4.0, 6.0, 6.0 ]
+                    },
+                    "short":
+                    {
+                        "shutter": [ 100, 5000, 10000, 20000, 120000 ],
+                        "gain": [ 1.0, 2.0, 4.0, 6.0, 6.0 ]
+                    }
+                },
+                "constraint_modes":
+                {
+                    "normal": [ { "bound": "LOWER", "q_lo": 0.98, "q_hi": 1.0, "y_target": [ 0, 0.5, 1000, 0.5 ] } ],
+                    "highlight": [
+                        { "bound": "LOWER", "q_lo": 0.98, "q_hi": 1.0, "y_target": [ 0, 0.5, 1000, 0.5 ] },
+                        { "bound": "UPPER", "q_lo": 0.98, "q_hi": 1.0, "y_target": [ 0, 0.8, 1000, 0.8 ] }
+                    ]
+                },
+                "y_target": [ 0, 0.16, 1000, 0.165, 10000, 0.17 ]
+            }
         }
     ]
 }
