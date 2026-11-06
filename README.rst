@@ -6,6 +6,15 @@
 
 **A complex camera support library for Linux, Android, and ChromeOS**
 
+.. image:: https://github.com/ams-OSRAM/libcamera/actions/workflows/build.yml/badge.svg
+   :target: https://github.com/ams-OSRAM/libcamera/actions/workflows/build.yml
+   :alt: Build
+.. image:: https://img.shields.io/badge/license-LGPL--2.1%2B-blue
+   :alt: License
+.. image:: https://img.shields.io/badge/fork%20of-raspberrypi%2Flibcamera-informational
+   :target: https://github.com/raspberrypi/libcamera
+   :alt: Fork of raspberrypi/libcamera
+
 Cameras are complex devices that need heavy hardware image processing
 operations. Control of the processing is based on advanced algorithms that must
 run on a programmable processor. This has traditionally been implemented in a
