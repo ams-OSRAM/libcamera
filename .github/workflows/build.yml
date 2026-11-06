@@ -1,0 +1,26 @@
+name: Build
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check ams-OSRAM tuning files are valid JSON
+        run: |
+          shopt -s nullglob
+          for f in src/ipa/rpi/*/data/mira*.json src/ipa/rpi/*/data/poncha110*.json; do
+            python3 -m json.tool "$f" > /dev/null || { echo "Invalid JSON: $f"; exit 1; }
+          done
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build pkgconf libyaml-dev libgnutls28-dev libdw-dev libevent-dev libudev-dev python3-jinja2 python3-ply python3-yaml
+          pip3 install --user meson
+      - name: Build
+        run: |
+          meson setup build -Dpipelines=rpi/vc4,rpi/pisp -Dipas=rpi/vc4,rpi/pisp -Dtest=false -Dcam=disabled -Dqcam=disabled -Dgstreamer=disabled -Dlc-compliance=disabled
+          ninja -C build
