@@ -44,6 +44,47 @@ namespace libcamera {
  */
 
 /**
+ * \var DebayerParams::kLscGridSize
+ * \brief Number of lens shading grid areas in one direction
+ */
+
+/**
+ * \var DebayerParams::kLscValuesPerCell
+ * \brief Number of pixel values per each of the lens shading grid areas
+ */
+
+/**
+ * \var DebayerParams::kLscBytesPerCell
+ * \brief Number of bytes per each of the lens shading grid areas
+ */
+
+/**
+ * \typedef DebayerParams::LscLookupTable
+ * \brief Lookup table for lens shading correction
+ *
+ * It's an array of values to be later used as a texture.
+ * The values are in row - column - RGB order.
+ */
+
+/**
+ * \var DebayerParams::lscLut
+ * \brief Lens shading lookup table
+ */
+
+/**
+ * \var DebayerParams::identityLscLut
+ * \brief Lens shading lookup table of identity mapping
+ *
+ * This table can be used to initialise the lens shading lookup table or to
+ * not apply any real lens shading correction.
+ */
+
+/**
+ * \var DebayerParams::lscLutVersion
+ * \brief Incremented on each \a lscLut change
+ */
+
+/**
  * \class Debayer
  * \brief Base debayering class
  *
@@ -71,6 +112,7 @@ Debayer::~Debayer()
  * \param[in] inputCfg The input configuration
  * \param[in] outputCfgs The output configurations
  * \param[in] ccmEnabled Whether a color correction matrix is applied
+ * \param[in] lscEnabled Whether lens shading correction grid is provided
  *
  * \return 0 on success, a negative errno on failure
  */
@@ -101,6 +143,14 @@ Debayer::~Debayer()
  *
  * \return A tuple of the stride and the frame size, or a tuple with 0,0 if
  * there is no valid output config
+ */
+
+/**
+ * \fn uint32_t Debayer::preferredInputStride(const PixelFormat &inputFormat, const Size &size)
+ * Get the preferred input stride in bytes for the given input format and size
+ * \param[in] inputFormat The input format
+ * \param[in] size The input size (width and height in pixels)
+ * \return The preferred input stride in bytes or 0 if there is no preference
  */
 
 /**
@@ -183,9 +233,6 @@ Debayer::~Debayer()
  *
  * Defines how the output of the debayer process is laid out in memory.
  * It includes per-pixel size, stride, and total frame size.
- *
- * \var Debayer::DebayerOutputConfig::bpp
- * Bytes used per pixel in the output format.
  *
  * \var Debayer::DebayerOutputConfig::stride
  * Line stride in bytes for the output frame.

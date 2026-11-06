@@ -8,6 +8,7 @@
 #include "pipeline_base.h"
 
 #include <chrono>
+#include <optional>
 
 #include <linux/media-bus-format.h>
 #include <linux/videodev2.h>
@@ -43,12 +44,12 @@ namespace {
 
 constexpr unsigned int defaultRawBitDepth = 12;
 
-PixelFormat mbusCodeToPixelFormat(unsigned int code,
-				  BayerFormat::Packing packingReq)
+std::optional<PixelFormat>
+mbusCodeToPixelFormat(unsigned int code, BayerFormat::Packing packingReq)
 {
 	BayerFormat bayer = BayerFormat::fromMbusCode(code);
-
-	ASSERT(bayer.isValid());
+	if (!bayer.isValid())
+		return std::nullopt;
 
 	bayer.packing = packingReq;
 	PixelFormat pix = bayer.toPixelFormat();
@@ -62,6 +63,9 @@ PixelFormat mbusCodeToPixelFormat(unsigned int code,
 		bayer.packing = BayerFormat::Packing::None;
 		pix = bayer.toPixelFormat();
 	}
+
+	if (!pix.isValid())
+		return std::nullopt;
 
 	return pix;
 }
@@ -342,12 +346,12 @@ bool PipelineHandlerBase::updateStreamConfig(StreamConfiguration *stream,
 	}
 
 	if (stream->colorSpace != format.colorSpace) {
-		stream->colorSpace = format.colorSpace;
-		adjusted = true;
 		LOG(RPI, Debug)
 			<< "Color space changed from "
 			<< ColorSpace::toString(stream->colorSpace) << " to "
 			<< ColorSpace::toString(format.colorSpace);
+		stream->colorSpace = format.colorSpace;
+		adjusted = true;
 	}
 
 	stream->stride = format.planes[0].bpl;
@@ -378,24 +382,26 @@ V4L2DeviceFormat PipelineHandlerBase::toV4L2DeviceFormat(const V4L2VideoDevice *
 							 BayerFormat::Packing packingReq)
 {
 	unsigned int code = format.code;
-	const PixelFormat pix = mbusCodeToPixelFormat(code, packingReq);
 	V4L2DeviceFormat deviceFormat;
 
-	deviceFormat.fourcc = dev->toV4L2PixelFormat(pix);
+	const std::optional<PixelFormat> pix = mbusCodeToPixelFormat(code, packingReq);
+	ASSERT(pix.has_value());
+
+	deviceFormat.fourcc = dev->toV4L2PixelFormat(*pix);
 	deviceFormat.size = format.size;
 	deviceFormat.colorSpace = format.colorSpace;
 	return deviceFormat;
 }
 
 std::unique_ptr<CameraConfiguration>
-PipelineHandlerBase::generateConfiguration(Camera *camera, Span<const StreamRole> roles)
+PipelineHandlerBase::generateConfiguration(Camera *camera, std::span<const StreamRole> roles)
 {
 	CameraData *data = cameraData(camera);
 	std::unique_ptr<CameraConfiguration> config =
 		std::make_unique<RPiCameraConfiguration>(data);
 	V4L2SubdeviceFormat sensorFormat;
 	unsigned int bufferCount;
-	PixelFormat pixelFormat;
+	std::optional<PixelFormat> pixelFormat;
 	V4L2VideoDevice::Formats fmts;
 	Size size;
 	std::optional<ColorSpace> colorSpace;
@@ -411,7 +417,7 @@ PipelineHandlerBase::generateConfiguration(Camera *camera, Span<const StreamRole
 			sensorFormat = data->findBestFormat(size, defaultRawBitDepth);
 			pixelFormat = mbusCodeToPixelFormat(sensorFormat.code,
 							    BayerFormat::Packing::CSI2);
-			ASSERT(pixelFormat.isValid());
+			ASSERT(pixelFormat.has_value());
 			colorSpace = ColorSpace::Raw;
 			bufferCount = 2;
 			break;
@@ -468,10 +474,10 @@ PipelineHandlerBase::generateConfiguration(Camera *camera, Span<const StreamRole
 		if (role == StreamRole::Raw) {
 			/* Translate the MBUS codes to a PixelFormat. */
 			for (const auto &format : data->sensorFormats_) {
-				PixelFormat pf = mbusCodeToPixelFormat(format.first,
-								       BayerFormat::Packing::CSI2);
-				if (pf.isValid())
-					deviceFormats.emplace(std::piecewise_construct, std::forward_as_tuple(pf),
+				std::optional<PixelFormat> pf = mbusCodeToPixelFormat(format.first,
+										      BayerFormat::Packing::CSI2);
+				if (pf.has_value())
+					deviceFormats.emplace(std::piecewise_construct, std::forward_as_tuple(*pf),
 							      std::forward_as_tuple(format.second.begin(), format.second.end()));
 			}
 		} else {
@@ -498,7 +504,7 @@ PipelineHandlerBase::generateConfiguration(Camera *camera, Span<const StreamRole
 		StreamFormats formats(deviceFormats);
 		StreamConfiguration cfg(formats);
 		cfg.size = size;
-		cfg.pixelFormat = pixelFormat;
+		cfg.pixelFormat = *pixelFormat;
 		cfg.colorSpace = colorSpace;
 		cfg.bufferCount = bufferCount;
 		config->addConfiguration(cfg);
@@ -734,6 +740,7 @@ void PipelineHandlerBase::stopDevice(Camera *camera)
 	data->frontendDevice()->setFrameStartEnabled(false);
 
 	data->clearIncompleteRequests();
+	data->clearImmediateControls();
 
 	/* Stop the IPA. */
 	data->ipa_->stop();
@@ -878,6 +885,16 @@ int PipelineHandlerBase::registerCamera(std::unique_ptr<RPi::CameraData> &camera
 	data->ipa_->setLensControls.connect(data, &CameraData::setLensControls);
 	data->ipa_->metadataReady.connect(data, &CameraData::metadataReady);
 
+	/*
+	 * Disable the IPA signal to control timeout, when there is a
+	 * user-requested value. We do this here now that the IPA and
+	 * front end device are both initialized.
+	 */
+	if (data->config_.cameraTimeoutValue) {
+		data->ipa_->setCameraTimeout.disconnect();
+		data->frontendDevice()->setDequeueTimeout(data->config_.cameraTimeoutValue * 1ms);
+	}
+
 	return 0;
 }
 
@@ -893,7 +910,7 @@ void PipelineHandlerBase::mapBuffers(Camera *camera, const BufferMap &buffers, u
 	 * handler and the IPA.
 	 */
 	for (const auto &[id, buffer] : buffers) {
-		Span<const FrameBuffer::Plane> planes = buffer.buffer->planes();
+		std::span<const FrameBuffer::Plane> planes = buffer.buffer->planes();
 
 		bufferIds.emplace_back(mask | id,
 				       std::vector<FrameBuffer::Plane>{ planes.begin(), planes.end() });
@@ -948,9 +965,13 @@ V4L2SubdeviceFormat CameraData::findBestFormat(const Size &req, unsigned int bit
 
 	/* Calculate the closest/best mode from the user requested size. */
 	for (const auto &[mbusCode, sizes] : sensorFormats_) {
-		const PixelFormat format = mbusCodeToPixelFormat(mbusCode,
-								 BayerFormat::Packing::None);
-		const PixelFormatInfo &info = PixelFormatInfo::info(format);
+		const std::optional<PixelFormat> format =
+			mbusCodeToPixelFormat(mbusCode, BayerFormat::Packing::None);
+
+		if (!format.has_value())
+			continue;
+
+		const PixelFormatInfo &info = PixelFormatInfo::info(*format);
 
 		for (const Size &size : sizes) {
 			double reqAr = static_cast<double>(req.width) / req.height;
@@ -971,7 +992,7 @@ V4L2SubdeviceFormat CameraData::findBestFormat(const Size &req, unsigned int bit
 			}
 
 			LOG(RPI, Debug) << "Format: " << size
-					<< " fmt " << format
+					<< " fmt " << *format
 					<< " Score: " << score
 					<< " (best " << bestScore << ")";
 		}
@@ -1145,12 +1166,6 @@ int CameraData::loadPipelineConfiguration()
 	config_.cameraTimeoutValue =
 		phConfig["camera_timeout_value_ms"].get<unsigned int>(config_.cameraTimeoutValue);
 
-	if (config_.cameraTimeoutValue) {
-		/* Disable the IPA signal to control timeout and set the user requested value. */
-		ipa_->setCameraTimeout.disconnect();
-		frontendDevice()->setDequeueTimeout(config_.cameraTimeoutValue * 1ms);
-	}
-
 	config_.controllerMinFrameDurationUs =
 		phConfig["controller_min_frame_duration_us"].get<double>(config_.controllerMinFrameDurationUs);
 
@@ -1161,7 +1176,13 @@ int CameraData::loadIPA(ipa::RPi::InitResult *result)
 {
 	int ret;
 
-	ipa_ = pipe()->createIPA<ipa::RPi::IPAProxyRPi>(1, 1);
+	/*
+	 * Explicitly pass pipe()->name() to select the IPA to create.
+	 * The default behavior of creating the IPA by the IPA proxy type name
+	 * does not work because the same IPAProxyRPi type is used for both
+	 * the rpi/vc4 and rpi/pisp pipeline handlers.
+	 */
+	ipa_ = pipe()->createIPA<ipa::RPi::IPAProxyRPi>(pipe()->name(), 1, 1);
 
 	if (!ipa_)
 		return -ENOENT;
@@ -1254,7 +1275,7 @@ void CameraData::metadataReady(const ControlList &metadata)
 			*notifyGainsUnity_,
 			static_cast<int32_t>((*colourGains)[0] * *notifyGainsUnity_)
 		};
-		ctrls.set(V4L2_CID_NOTIFY_GAINS, Span<const int32_t>{ gains });
+		ctrls.set(V4L2_CID_NOTIFY_GAINS, std::span<const int32_t>{ gains });
 
 		sensor_->setControls(&ctrls);
 	}
@@ -1312,7 +1333,7 @@ Rectangle CameraData::scaleIspCrop(const Rectangle &ispCrop) const
 
 void CameraData::applyScalerCrop(const ControlList &controls)
 {
-	const auto &scalerCropRPi = controls.get<Span<const Rectangle>>(controls::rpi::ScalerCrops);
+	const auto &scalerCropRPi = controls.get<std::span<const Rectangle>>(controls::rpi::ScalerCrops);
 	const auto &scalerCropCore = controls.get<Rectangle>(controls::ScalerCrop);
 	std::vector<Rectangle> scalerCrops;
 
@@ -1414,6 +1435,11 @@ void CameraData::clearIncompleteRequests()
 		pipe()->completeRequest(request);
 		requestQueue_.pop();
 	}
+}
+
+void CameraData::clearImmediateControls()
+{
+	immediateControls_ = {};
 }
 
 void CameraData::handleStreamBuffer(FrameBuffer *buffer, RPi::Stream *stream)
@@ -1522,9 +1548,58 @@ void CameraData::fillRequestMetadata(const ControlList &bufferControls, Request 
 		request->_d()->metadata().set(controls::ScalerCrop, crops[0]);
 		if (crops.size() > 1) {
 			request->_d()->metadata().set(controls::rpi::ScalerCrops,
-						      Span<const Rectangle>(crops.data(),
-									    crops.size()));
+						      std::span<const Rectangle>(crops.data(),
+										 crops.size()));
 		}
+	}
+}
+
+static bool isControlDelayed(unsigned int id)
+{
+	return id == controls::ExposureTime ||
+	       id == controls::AnalogueGain ||
+	       id == controls::FrameDurationLimits ||
+	       id == controls::AeEnable ||
+	       id == controls::ExposureTimeMode ||
+	       id == controls::AnalogueGainMode;
+}
+
+void CameraData::handleControlLists(uint32_t delayContext, ControlList &paramControls)
+{
+	/*
+	 * The delayContext is the sequence number after it's gone through the various
+	 * pipeline delays, so that's what gets reported as the "ControlListSequence"
+	 * in the metadata, being the sequence number of the request whose ControlList
+	 * has just been applied.
+	 */
+	Request *request = requestQueue_.front();
+	request->_d()->metadata().set(controls::rpi::ControlListSequence, delayContext);
+
+	/*
+	 * Controls that take effect immediately (typically ISP controls) have to be
+	 * delayed so as to synchronise with those controls that do get delayed. So we
+	 * must remove them from the current request, and push them onto a queue so
+	 * that they can be used later.
+	 *
+	 * Note that we are given a separate control list (paramControls) so that
+	 * we can pass back the controls that really need to happen now, without
+	 * disturbing the controls that were submitted with the request.
+	 */
+	ASSERT(paramControls.empty());
+	immediateControls_.push({ request->sequence(), {} });
+	for (const auto &ctrl : request->controls()) {
+		if (isControlDelayed(ctrl.first))
+			paramControls.set(ctrl.first, ctrl.second);
+		else
+			immediateControls_.back().controls.set(ctrl.first, ctrl.second);
+	}
+
+	/* "Immediate" controls that have become due are now merged back into this request. */
+	while (!immediateControls_.empty() &&
+	       immediateControls_.front().controlListId <= delayContext) {
+		paramControls.merge(immediateControls_.front().controls,
+				    ControlList::MergePolicy::OverwriteExisting);
+		immediateControls_.pop();
 	}
 }
 

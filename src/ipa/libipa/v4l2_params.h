@@ -2,19 +2,20 @@
 /*
  * Copyright (C) 2025, Ideas On Board
  *
- * V4L2 Parameters
+ * V4L2 ISP Parameters
  */
 
 #pragma once
 
 #include <map>
+#include <span>
 #include <stdint.h>
 #include <string.h>
 
 #include <linux/media/v4l2-isp.h>
 
 #include <libcamera/base/log.h>
-#include <libcamera/base/span.h>
+#include <libcamera/base/utils.h>
 
 namespace libcamera {
 
@@ -26,7 +27,7 @@ template<typename T>
 class V4L2ParamsBlock
 {
 public:
-	V4L2ParamsBlock(const Span<uint8_t> data)
+	V4L2ParamsBlock(std::span<uint8_t> data)
 		: data_(data)
 	{
 	}
@@ -65,25 +66,37 @@ public:
 	}
 
 protected:
-	Span<uint8_t> data_;
+	std::span<uint8_t> data_;
+};
+
+class V4L2ParamsBase
+{
+protected:
+	V4L2ParamsBase(std::span<uint8_t> data, unsigned int version);
+
+public:
+	size_t bytesused() const { return used_; }
+
+protected:
+	std::span<uint8_t> block(uint16_t type, unsigned int blockType,
+				 size_t blockSize);
+
+	std::span<uint8_t> data_;
+	size_t used_;
+
+	std::map<uint16_t, std::span<uint8_t>> blocks_;
 };
 
 template<typename Traits>
-class V4L2Params
+class V4L2Params : public V4L2ParamsBase
 {
 public:
-	V4L2Params(Span<uint8_t> data, unsigned int version)
-		: data_(data)
+	static_assert(std::is_same_v<std::underlying_type_t<typename Traits::id_type>, uint16_t>);
+
+	V4L2Params(std::span<uint8_t> data, unsigned int version)
+		: V4L2ParamsBase(data, version)
 	{
-		struct v4l2_isp_params_buffer *params =
-			reinterpret_cast<struct v4l2_isp_params_buffer *>(data_.data());
-		params->data_size = 0;
-		params->version = version;
-
-		used_ = offsetof(struct v4l2_isp_params_buffer, data);
 	}
-
-	size_t bytesused() const { return used_; }
 
 	template<typename Traits::id_type Id>
 	auto block()
@@ -93,58 +106,10 @@ public:
 		using Type = typename Details::type;
 		constexpr auto kernelId = Details::blockType;
 
-		auto data = block(Id, kernelId, sizeof(Type));
+		auto data = V4L2ParamsBase::block(utils::to_underlying(Id),
+						  kernelId, sizeof(Type));
 		return V4L2ParamsBlock<Type>(data);
 	}
-
-protected:
-	Span<uint8_t> block(typename Traits::id_type type,
-			    unsigned int blockType, size_t blockSize)
-	{
-		/*
-		 * Look up the block in the cache first. If an algorithm
-		 * requests the same block type twice, it should get the same
-		 * block.
-		 */
-		auto cacheIt = blocks_.find(type);
-		if (cacheIt != blocks_.end())
-			return cacheIt->second;
-
-		/*
-		 * Make sure we don't run out of space. Assert as otherwise
-		 * we get a segfault as soon as someone tries to access the
-		 * empty Span<> returned from here.
-		 */
-		if (blockSize > data_.size() - used_) {
-			LOG(Fatal)
-				<< "Parameters buffer out of space; potential version mismatch between driver and libcamera";
-			return {};
-		}
-
-		/* Allocate a new block, clear its memory, and initialize its header. */
-		Span<uint8_t> block = data_.subspan(used_, blockSize);
-		memset(block.data(), 0, block.size());
-
-		struct v4l2_isp_params_block_header *header =
-			reinterpret_cast<struct v4l2_isp_params_block_header *>(block.data());
-		header->type = blockType;
-		header->size = block.size();
-
-		used_ += block.size();
-
-		reinterpret_cast<struct v4l2_isp_params_buffer *>
-			(data_.data())->data_size += block.size();
-
-		/* Update the cache. */
-		blocks_[type] = block;
-
-		return block;
-	}
-
-	Span<uint8_t> data_;
-	size_t used_;
-
-	std::map<typename Traits::id_type, Span<uint8_t>> blocks_;
 };
 
 } /* namespace ipa */

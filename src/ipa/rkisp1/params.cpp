@@ -91,7 +91,7 @@ void RkISP1Params::setBlockEnabled(BlockType type, bool enabled)
 		cfg->module_ens &= ~info.enableBit;
 }
 
-Span<uint8_t> RkISP1Params::block(BlockType type)
+std::span<uint8_t> RkISP1Params::block(BlockType type)
 {
 	auto infoIt = kBlockTypeInfo.find(type);
 	if (infoIt == kBlockTypeInfo.end()) {
@@ -128,7 +128,8 @@ Span<uint8_t> RkISP1Params::block(BlockType type)
 		return data_.subspan(info.offset, info.size);
 	}
 
-	return V4L2Params::block(type, info.type, info.size);
+	return V4L2ParamsBase::block(utils::to_underlying(type), info.type,
+				     info.size);
 }
 
 } /* namespace ipa::rkisp1 */

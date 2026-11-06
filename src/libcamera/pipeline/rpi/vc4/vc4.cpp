@@ -938,7 +938,7 @@ void Vc4CameraData::setIspControls(const ControlList &controls)
 	if (ctrls.contains(V4L2_CID_USER_BCM2835_ISP_LENS_SHADING)) {
 		ControlValue &value =
 			const_cast<ControlValue &>(ctrls.get(V4L2_CID_USER_BCM2835_ISP_LENS_SHADING));
-		Span<uint8_t> s = value.data();
+		std::span<uint8_t> s = value.data();
 		bcm2835_isp_lens_shading *ls =
 			reinterpret_cast<bcm2835_isp_lens_shading *>(s.data());
 		ls->dmabuf = lsTable_.get();
@@ -984,9 +984,6 @@ void Vc4CameraData::tryRunPipeline()
 
 	fillRequestMetadata(bayerFrame.controls, request);
 
-	/* Set our state to say the pipeline is active. */
-	state_ = State::Busy;
-
 	unsigned int bayer = unicam_[Unicam::Image].getBufferId(bayerFrame.buffer);
 
 	LOG(RPI, Debug) << "Signalling prepareIsp:"
@@ -995,10 +992,16 @@ void Vc4CameraData::tryRunPipeline()
 	ipa::RPi::PrepareParams params;
 	params.buffers.bayer = RPi::MaskBayerData | bayer;
 	params.sensorControls = std::move(bayerFrame.controls);
-	params.requestControls = request->controls();
 	params.ipaContext = request->sequence();
 	params.delayContext = bayerFrame.delayContext;
 	params.buffers.embedded = 0;
+	/* params.requestControls is set by handleControlLists. */
+
+	/* This sorts out synchronisation with ControlLists in earlier requests. */
+	handleControlLists(bayerFrame.delayContext, params.requestControls);
+
+	/* Set our state to say the pipeline is active. */
+	state_ = State::Busy;
 
 	if (embeddedBuffer) {
 		unsigned int embeddedId = unicam_[Unicam::Embedded].getBufferId(embeddedBuffer);

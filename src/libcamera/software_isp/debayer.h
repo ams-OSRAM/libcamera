@@ -40,12 +40,14 @@ public:
 
 	virtual int configure(const StreamConfiguration &inputCfg,
 			      const std::vector<std::reference_wrapper<const StreamConfiguration>> &outputCfgs,
-			      bool ccmEnabled) = 0;
+			      bool ccmEnabled,
+			      bool lscEnabled) = 0;
 
 	virtual std::vector<PixelFormat> formats(PixelFormat inputFormat) = 0;
 
 	virtual std::tuple<unsigned int, unsigned int>
 	strideAndFrameSize(const PixelFormat &outputFormat, const Size &size) = 0;
+	virtual uint32_t preferredInputStride([[maybe_unused]] const PixelFormat &inputFormat, [[maybe_unused]] const Size &size) { return 0; }
 
 	virtual void process(uint32_t frame, FrameBuffer *input, FrameBuffer *output, const DebayerParams &params) = 0;
 	virtual int start() { return 0; }
@@ -68,7 +70,6 @@ public:
 	};
 
 	struct DebayerOutputConfig {
-		unsigned int bpp;
 		unsigned int stride;
 		unsigned int frameSize;
 	};

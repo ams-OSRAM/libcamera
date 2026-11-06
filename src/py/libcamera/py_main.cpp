@@ -34,6 +34,7 @@ LOG_DEFINE_CATEGORY(Python)
 
 }
 
+#if PYBIND11_VERSION_MAJOR < 3
 /*
  * This is a holder class used only for the Camera class, for the sole purpose
  * of avoiding the compilation issue with Camera's private destructor.
@@ -79,6 +80,13 @@ private:
 
 PYBIND11_DECLARE_HOLDER_TYPE(T, PyCameraSmartPtr<T>)
 
+using PyCameraHolder = PyCameraSmartPtr<Camera>;
+using PyCameraArg = PyCameraSmartPtr<Camera>;
+#else
+using PyCameraHolder = py::smart_holder;
+using PyCameraArg = std::shared_ptr<Camera>;
+#endif
+
 /*
  * Note: global C++ destructors can be ran on this before the py module is
  * destructed.
@@ -103,7 +111,7 @@ PYBIND11_MODULE(_libcamera, m)
 	 */
 
 	auto pyCameraManager = py::class_<PyCameraManager, std::shared_ptr<PyCameraManager>>(m, "CameraManager");
-	auto pyCamera = py::class_<Camera, PyCameraSmartPtr<Camera>>(m, "Camera");
+	auto pyCamera = py::class_<Camera, PyCameraHolder>(m, "Camera");
 	auto pySensorConfiguration = py::class_<SensorConfiguration>(m, "SensorConfiguration");
 	auto pyCameraConfiguration = py::class_<CameraConfiguration>(m, "CameraConfiguration");
 	auto pyCameraConfigurationStatus = py::enum_<CameraConfiguration::Status>(pyCameraConfiguration, "Status");
@@ -347,7 +355,7 @@ PYBIND11_MODULE(_libcamera, m)
 		.def("range", &StreamFormats::range);
 
 	pyFrameBufferAllocator
-		.def(py::init<PyCameraSmartPtr<Camera>>(), py::keep_alive<1, 2>())
+		.def(py::init<PyCameraArg>(), py::keep_alive<1, 2>())
 		.def("allocate", [](FrameBufferAllocator &self, Stream *stream) {
 			int ret = self.allocate(stream);
 			if (ret < 0)
@@ -368,11 +376,11 @@ PYBIND11_MODULE(_libcamera, m)
 		});
 
 	pyFrameBuffer
-		.def(py::init<std::vector<FrameBuffer::Plane>, unsigned int>(),
+		.def(py::init<std::vector<FrameBuffer::Plane>, uint64_t>(),
 		     py::arg("planes"), py::arg("cookie") = 0)
 		.def_property_readonly("metadata", &FrameBuffer::metadata, py::return_value_policy::reference_internal)
 		.def_property_readonly("planes", [](const FrameBuffer &self) {
-			/* Convert from Span<> to std::vector<> */
+			/* Convert from std::span<> to std::vector<> */
 			/* Note: this creates copies */
 			auto planes = self.planes();
 			std::vector<FrameBuffer::Plane> v(planes.begin(), planes.end());
@@ -498,7 +506,7 @@ PYBIND11_MODULE(_libcamera, m)
 		.def_readonly("sequence", &FrameMetadata::sequence)
 		.def_readonly("timestamp", &FrameMetadata::timestamp)
 		.def_property_readonly("planes", [](const FrameMetadata &self) {
-			/* Convert from Span<> to std::vector<> */
+			/* Convert from std::span<> to std::vector<> */
 			/* Note: this creates a copy */
 			auto planes = self.planes();
 			std::vector<FrameMetadata::Plane> v(planes.begin(), planes.end());
