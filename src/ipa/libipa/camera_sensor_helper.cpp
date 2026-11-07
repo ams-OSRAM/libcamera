@@ -599,10 +599,6 @@ public:
 };
 REGISTER_CAMERA_SENSOR_HELPER("imx296", CameraSensorHelperImx296)
 
-class CameraSensorHelperMira220 : public CameraSensorHelper
-{
-};
-REGISTER_CAMERA_SENSOR_HELPER("mira220", CameraSensorHelperMira220)
 
 
 class CameraSensorHelperImx327 : public CameraSensorHelperImx290
