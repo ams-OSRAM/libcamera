@@ -11,6 +11,7 @@
 #include <stdlib.h>
 #include <algorithm>
 #include <cmath>
+#include <iterator>
 
 #include <libcamera/base/log.h>
 
@@ -166,56 +167,6 @@ private:
 	15.458,
 	16,
 	};
-	static constexpr float gainLut10bit[] = {
-	1,
-	1.018,
-	1.056,
-	1.075,
-	1.118,
-	1.14,
-	1.188,
-	1.213,
-	1.267,
-	1.295,
-	1.326,
-	1.373,
-	1.425,
-	1.462,
-	1.5,
-	1.541,
-	1.583,
-	1.652,
-	1.701,
-	1.727,
-	1.781,
-	1.839,
-	1.9,
-	1.966,
-	2,
-	2.073,
-	2.151,
-	2.192,
-	2.28,
-	2.327,
-	2.426,
-	2.478,
-	2.533,
-	2.651,
-	2.714,
-	2.78,
-	2.886,
-	2.961,
-	3.04,
-	3.167,
-	3.257,
-	3.353,
-	3.455,
-	3.563,
-	3.619,
-	3.738,
-	3.864,
-	4,
-	};
 	// void populateMetadata(const MdParser::RegisterMap &registers,
 	// 		      Metadata &metadata) const override;
 };
@@ -229,68 +180,26 @@ CamHelperMira050::CamHelperMira050()
 {
 }
 
+/*
+ * The driver's analogue gain code k selects entry k - 1 of the gain table. The
+ * driver limits the code range per mode: 1 to 95 in 8-bit modes (1x to 16x),
+ * 1 to 48 in 10-bit modes (1x to 4x, the same first entries) and only 1 in
+ * 12-bit modes (fixed 1x). The conversion therefore does not depend on the
+ * mode, which matters because the IPA converts the gain limits of a new mode
+ * before it passes that mode to the helper.
+ */
 uint32_t CamHelperMira050::gainCode(double gain) const
 {
-	if (mode_.bitdepth == 12) {
-		return std::log2(gain);
-	} else if (mode_.bitdepth == 10) {
-		uint32_t sizeLut = sizeof(gainLut10bit) / sizeof(gainLut10bit[0]);
-		uint32_t gainCode = 0;
-		if (gain <= gainLut10bit[0]) {
-			gainCode = 0;
-		} else if (gain >= gainLut10bit[sizeLut - 1]) {
-			gainCode = (sizeLut - 1);
-		} else {
-			while (gainCode < sizeLut - 1) {
-				if (gain >= gainLut10bit[gainCode] && gain < gainLut10bit[gainCode+1]) {
-					break;
-				}
-				gainCode++;
-			}
-		}
-		LOG(IPARPI, Debug) << "gain: " << gain << " gainCode: " << gainCode;
-		return gainCode;
-	} else if (mode_.bitdepth == 8) {
-		uint32_t sizeLut = sizeof(gainLut8bit) / sizeof(gainLut8bit[0]);
-		uint32_t gainCode = 0;
-		if (gain <= gainLut8bit[0]) {
-			gainCode = 0;
-		} else if (gain >= gainLut8bit[sizeLut - 1]) {
-			gainCode = (sizeLut - 1);
-		} else {
-			while (gainCode < sizeLut - 1) {
-				if (gain >= gainLut8bit[gainCode] && gain < gainLut8bit[gainCode+1]) {
-					break;
-				}
-				gainCode++;
-			}
-		}
-		LOG(IPARPI, Debug) << "gain: " << gain << " gainCode: " << gainCode;
-		return gainCode;
-	} else {
-		return (uint32_t)(gain);
-	}
+	constexpr size_t n = std::size(gainLut8bit);
+	size_t i = 0;
+	while (i + 1 < n && gain >= gainLut8bit[i + 1])
+		i++;
+	return i + 1;
 }
 
 double CamHelperMira050::gain(uint32_t gainCode) const
 {
-	if (mode_.bitdepth == 12) {
-		return std::exp2(gainCode);
-	} else if (mode_.bitdepth == 10){
-		uint32_t sizeLut = sizeof(gainLut10bit) / sizeof(gainLut10bit[0]);
-		if (gainCode >= sizeLut) {
-			gainCode = sizeLut - 1;
-		}
-		return (double)(gainLut10bit[gainCode]);
-	} else if (mode_.bitdepth == 8){
-		uint32_t sizeLut = sizeof(gainLut8bit) / sizeof(gainLut8bit[0]);
-		if (gainCode >= sizeLut) {
-			gainCode = sizeLut - 1;
-		}
-		return (double)(gainLut8bit[gainCode]);
-	} else {
-		return (double)(gainCode);
-	}
+	return gainLut8bit[std::clamp<size_t>(gainCode, 1, std::size(gainLut8bit)) - 1];
 }
 
 
