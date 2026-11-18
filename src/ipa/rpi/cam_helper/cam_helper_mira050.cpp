@@ -11,7 +11,6 @@
 #include <stdlib.h>
 #include <algorithm>
 #include <cmath>
-#include <iterator>
 
 #include <libcamera/base/log.h>
 
@@ -69,104 +68,6 @@ private:
 	// #define MIRA050_DATA_RATE			1000 // Mbit/s
 	// #define MIRA050_MIN_ROW_LENGTH			1842
 
-	static constexpr float gainLut8bit[] = 
-	{
-	1,
-	1.018,
-	1.056,
-	1.075,
-	1.118,
-	1.14,
-	1.188,
-	1.213,
-	1.267,
-	1.295,
-	1.326,
-	1.373,
-	1.425,
-	1.462,
-	1.5,
-	1.541,
-	1.583,
-	1.652,
-	1.701,
-	1.727,
-	1.781,
-	1.839,
-	1.9,
-	1.966,
-	2,
-	2.073,
-	2.151,
-	2.192,
-	2.28,
-	2.327,
-	2.426,
-	2.478,
-	2.533,
-	2.651,
-	2.714,
-	2.78,
-	2.886,
-	2.961,
-	3.04,
-	3.167,
-	3.257,
-	3.353,
-	3.455,
-	3.563,
-	3.619,
-	3.738,
-	3.864,
-	4,
-	4.071,
-	4.222,
-	4.302,
-	4.471,
-	4.56,
-	4.75,
-	4.851,
-	5.067,
-	5.182,
-	5.302,
-	5.494,
-	5.7,
-	5.846,
-	6,
-	6.247,
-	6.423,
-	6.609,
-	6.806,
-	7.015,
-	7.238,
-	7.355,
-	7.6,
-	7.862,
-	8.143,
-	8.291,
-	8.604,
-	8.769,
-	9.12,
-	9.306,
-	9.702,
-	9.913,
-	10.133,
-	10.605,
-	10.857,
-	11.259,
-	11.544,
-	11.844,
-	12.324,
-	12.667,
-	13.029,
-	13.412,
-	13.818,
-	14.25,
-	14.71,
-	14.951,
-	15.458,
-	16,
-	};
 	// void populateMetadata(const MdParser::RegisterMap &registers,
 	// 		      Metadata &metadata) const override;
 };
@@ -181,25 +82,33 @@ CamHelperMira050::CamHelperMira050()
 }
 
 /*
- * The driver's analogue gain code k selects entry k - 1 of the gain table. The
- * driver limits the code range per mode: 1 to 95 in 8-bit modes (1x to 16x),
- * 1 to 48 in 10-bit modes (1x to 4x, the same first entries) and only 1 in
- * 12-bit modes (fixed 1x). The conversion therefore does not depend on the
- * mode, which matters because the IPA converts the gain limits of a new mode
- * before it passes that mode to the helper.
+ * The driver's analogue gain code is the gain in thousandths (1000 is 1x), up
+ * to 16000 in 8-bit modes, 4000 in 10-bit modes and only 1000 in 12-bit modes.
+ * The driver rounds it to the nearest gain the fine gain registers give:
+ *
+ *   gain = 57 * 2^n / (ADC_GAIN + 21)
+ *
+ * n is the octave of the gain (0 to 4) and ADC_GAIN is 21 to 63. Up to 4x the
+ * 8 and 10-bit modes give the same gains, so the conversion does not depend on
+ * the mode, which matters because the IPA converts the gain limits of a new
+ * mode before it passes that mode to the helper.
  */
 uint32_t CamHelperMira050::gainCode(double gain) const
 {
-	constexpr size_t n = std::size(gainLut8bit);
-	size_t i = 0;
-	while (i + 1 < n && gain >= gainLut8bit[i + 1])
-		i++;
-	return i + 1;
+	return std::max<long>(std::lround(gain * 1000), 1000);
 }
 
 double CamHelperMira050::gain(uint32_t gainCode) const
 {
-	return gainLut8bit[std::clamp<size_t>(gainCode, 1, std::size(gainLut8bit)) - 1];
+	/* The gain the driver programs for this code. */
+	uint32_t code = std::clamp<uint32_t>(gainCode, 1000, 16000);
+	uint32_t n = 0;
+	while (n < 4 && (57000u << (n + 1)) <= 84 * code)
+		n++;
+	uint32_t num = 57000u << n;
+	int adcGain = static_cast<int>((num + code / 2) / code) - 21;
+	adcGain = std::clamp(adcGain, 0, 63);
+	return static_cast<double>(num) / (adcGain + 21) / 1000.0;
 }
 
 
