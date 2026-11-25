@@ -6,18 +6,17 @@
         {
             "rpi.black_level":
             {
-                "black_level": 1600
+                "black_level": 1422
             }
         },
-
         {
             "rpi.lux":
             {
-                "reference_shutter_speed": 20316,
-                "reference_gain": 1.0,
+                "reference_shutter_speed": 785,
+                "reference_gain": 1.01,
                 "reference_aperture": 1.0,
-                "reference_lux": 530,
-                "reference_Y": 9873
+                "reference_lux": 370,
+                "reference_Y": 5081
             }
         },
         {
@@ -70,9 +69,27 @@
             {
                 "metering_modes":
                 {
-                    "centre-weighted": { "weights": [ 3, 3, 3, 2, 2, 2, 2, 1, 1, 1, 1, 0, 0, 0, 0 ] },
-                    "spot": { "weights": [ 2, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 ] },
-                    "matrix": { "weights": [ 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1 ] }
+                    "centre-weighted":
+                    {
+                        "weights":
+                        [
+                            3, 3, 3, 2, 2, 2, 2, 1, 1, 1, 1, 0, 0, 0, 0
+                        ]
+                    },
+                    "spot":
+                    {
+                        "weights":
+                        [
+                            2, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+                        ]
+                    },
+                    "matrix":
+                    {
+                        "weights":
+                        [
+                            1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1
+                        ]
+                    }
                 },
                 "exposure_modes":
                 {
@@ -89,13 +106,47 @@
                 },
                 "constraint_modes":
                 {
-                    "normal": [ { "bound": "LOWER", "q_lo": 0.98, "q_hi": 1.0, "y_target": [ 0, 0.5, 1000, 0.5 ] } ],
+                    "normal": [
+                        {
+                            "bound": "LOWER",
+                            "q_lo": 0.98,
+                            "q_hi": 1.0,
+                            "y_target":
+                            [
+                                0, 0.5,
+                                1000, 0.5
+                            ]
+                        }
+                    ],
                     "highlight": [
-                        { "bound": "LOWER", "q_lo": 0.98, "q_hi": 1.0, "y_target": [ 0, 0.5, 1000, 0.5 ] },
-                        { "bound": "UPPER", "q_lo": 0.98, "q_hi": 1.0, "y_target": [ 0, 0.8, 1000, 0.8 ] }
+                        {
+                            "bound": "LOWER",
+                            "q_lo": 0.98,
+                            "q_hi": 1.0,
+                            "y_target":
+                            [
+                                0, 0.5,
+                                1000, 0.5
+                            ]
+                        },
+                        {
+                            "bound": "UPPER",
+                            "q_lo": 0.98,
+                            "q_hi": 1.0,
+                            "y_target":
+                            [
+                                0, 0.8,
+                                1000, 0.8
+                            ]
+                        }
                     ]
                 },
-                "y_target": [ 0, 0.16, 1000, 0.165, 10000, 0.17 ]
+                "y_target":
+                [
+                    0, 0.16,
+                    1000, 0.165,
+                    10000, 0.17
+                ]
             }
         }
     ]
